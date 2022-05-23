@@ -4,6 +4,7 @@ import numpy as np
 import wave
 import math
 import matplotlib.pyplot as plt
+from drawnow import drawnow
 from utils import encode, decode, encode_int16
 
 
@@ -22,6 +23,7 @@ class Sine_tone:
         self.mic_buffer = np.zeros(self.MIC_BUFFER_SIZE, dtype=np.float32)
         self.mic_buffer_cur_index = 0
         self.doppler_shift = (0, 0)
+        self.fft_res = None
         self.relevant_freq_window = 33  # Relevant index window on the FFT, as described in the paper.
         self.fft_primary_tone_index = self.freqToFFTIndex(gen_freq)
 
@@ -112,9 +114,10 @@ class Sine_tone:
                 break
         right_bandwidth = last_right_bandwidth
 
-        # There are two threads working in this program, the comunication between those
+        # There are two threads working in this program, the communication between those
         # two threads is made by a global variable "doppler_shift".
         self.doppler_shift = (int(left_bandwidth), int(right_bandwidth))
+        self.fft_res = np.fft.fftshift(fft_data)
         # return (left_bandwidth, right_bandwidth)
 
     def callback(self, in_data, frame_count, time_info, flag):
@@ -137,12 +140,17 @@ class Sine_tone:
 
         return out_data, pyaudio.paContinue
 
+    def makeFig(self):
+        fft_len = self.fft_res.shape[0]
+        plt.plot(np.linspace(0, int(fft_len / 2) - 1, num=int(fft_len / 2)), self.fft_res[int(fft_len / 2):])
+        plt.xlim([700, 900])
+
 
 if __name__ == "__main__":
     CHANNELS = 1
     SAMPLE_RATE = 44100
-    chunk_length = 1024 # Size of the buffer that the callback receives and gives to the PyAudio interface.
-    gen_freq = 18000  # 18KHz, Frequency that we will be generating in the speakers.
+    chunk_length = 1024     # Size of the buffer that the callback receives and gives to the PyAudio interface.
+    gen_freq = 18000    # 18KHz, Frequency that we will be generating in the speakers.
     sine_tone_buffer_size = 44100  # The buffer as the size corresponding to 1 second.
 
     Sine_Dop = Sine_tone(sine_tone_buffer_size, SAMPLE_RATE, chunk_length, gen_freq)
@@ -157,25 +165,44 @@ if __name__ == "__main__":
     time_between_prints = 0.5  # 0.5 seconds
     counter = 0
     print('Press Ctrl+C to quit: ')
+
+    # plot a figure showing the ft result for each time
+    plt.ion()  # enable interactivity
+    fig = plt.figure()  # make a figure
+
     while stream.is_active():
         time.sleep(time_between_prints)
         # ch = input("Press (p to quit): ")
 
         left_bandwith = int(Sine_Dop.doppler_shift[0])
         right_bandwith = int(Sine_Dop.doppler_shift[1])
-        # print(doppler_shift)
-        str_left_space = ' ' * (Sine_Dop.relevant_freq_window - left_bandwith)
-        str_left = '<' * left_bandwith
-        str_right = '>' * right_bandwith
-        str_right_space = ' ' * (Sine_Dop.relevant_freq_window - right_bandwith)
-        print(str_left_space, str_left, "||", str_right, str_right_space)
+        # # print(doppler_shift)
+        # str_left_space = ' ' * (Sine_Dop.relevant_freq_window - left_bandwith)
+        # str_left = '<' * left_bandwith
+        # str_right = '>' * right_bandwith
+        # str_right_space = ' ' * (Sine_Dop.relevant_freq_window - right_bandwith)
+        # print(str_left_space, str_left, "||", str_right, str_right_space)
+        if left_bandwith > right_bandwith:
+            print('                              push backward*************************>')
+            print('                              push backward*************************>')
+            print('                              push backward*************************>')
+            print('                              push backward*************************>')
+            print('                              push backward*************************>')
+        else:
+            print('<*****************************push forward                          ')
+            print('<*****************************push forward                          ')
+            print('<*****************************push forward                          ')
+            print('<*****************************push forward                          ')
+            print('<*****************************push forward                          ')
 
-        if counter == 25:
+        drawnow(Sine_Dop.makeFig)
+
+        if counter == 100:
             # Times out in 250 cycles.
             # Exit and write to file.
             stream.stop_stream()
         counter += 1
-        print(counter)
+        # print(counter)
 
     stream.stop_stream()
     stream.close()
@@ -196,14 +223,13 @@ if __name__ == "__main__":
     # print("frame_count_global:", Sine_Dop.frame_count_global)
 
     # Plot the final 2048 FFT values.
-
-    fft_data = np.abs(np.fft.fft(Sine_Dop.mic_buffer))
-    print('fft_primary_tone_index: ', Sine_Dop.fft_primary_tone_index)
-    print('fft_data[fft_primary_tone_index]: ', fft_data[Sine_Dop.fft_primary_tone_index])
-
-    for i in range(820, 850):
-        print('fft_data[', i, ']: ', fft_data[i])
-
-    # plt.plot( np.abs( np.fft.fft(mic_buffer) ) )
-    plt.plot(np.abs(np.fft.fft(Sine_Dop.mic_buffer))[820:850])
-    plt.show()
+    # fft_data = np.abs(np.fft.fft(Sine_Dop.mic_buffer))
+    # print('fft_primary_tone_index: ', Sine_Dop.fft_primary_tone_index)
+    # print('fft_data[fft_primary_tone_index]: ', fft_data[Sine_Dop.fft_primary_tone_index])
+    #
+    # for i in range(820, 850):
+    #     print('fft_data[', i, ']: ', fft_data[i])
+    #
+    # # plt.plot( np.abs( np.fft.fft(mic_buffer) ) )
+    # plt.plot(np.abs(np.fft.fft(Sine_Dop.mic_buffer))[820:850])
+    # plt.show()
